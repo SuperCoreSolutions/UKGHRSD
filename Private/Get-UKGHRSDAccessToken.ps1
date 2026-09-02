@@ -61,7 +61,11 @@ function Get-UKGHRSDAccessToken {
             -ContentType 'application/x-www-form-urlencoded' -ErrorAction Stop
     }
     catch {
-        throw "UKG HRSD token request failed: $($_.Exception.Message)"
+        # Surface UKG's response body (OAuth 2.0 error / description) rather
+        # than the bare HTTP status — the difference between invalid_client,
+        # invalid_grant, and a wrong base URL is impossible to debug otherwise.
+        $detail = Get-UKGHRSDErrorMessage -ErrorRecord $_
+        throw "UKG HRSD token request to $tokenUri failed. $detail`nVerify -Region, -ClientId, and the application_id / application_secret with your UKG IPM contact (credentials are per-environment; staging and production credentials are not interchangeable)."
     }
 
     if (-not $response.access_token) {

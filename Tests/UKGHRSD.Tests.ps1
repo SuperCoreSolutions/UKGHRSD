@@ -10,8 +10,16 @@
     Run:  Invoke-Pester ./Tests
 #>
 
+# Top-level import so InModuleScope resolves during Pester's discovery phase
+# (Pester 6+ enforces this); also evict any already-loaded copy of the module
+# so we don't get "Multiple script or manifest modules named 'UKGHRSD' are
+# currently loaded" if the user has an installed copy alongside the source.
+Get-Module UKGHRSD -All | Remove-Module -Force -ErrorAction SilentlyContinue
+Import-Module (Join-Path (Split-Path -Parent $PSScriptRoot) 'UKGHRSD.psd1') -Force
+
 BeforeAll {
     $ModuleRoot = Split-Path -Parent $PSScriptRoot
+    Get-Module UKGHRSD -All | Remove-Module -Force -ErrorAction SilentlyContinue
     Import-Module (Join-Path $ModuleRoot 'UKGHRSD.psd1') -Force
 }
 
@@ -52,6 +60,65 @@ Describe 'Get-UKGHRSDRequest without a session' {
     It 'throws a connect-first error' {
         Disconnect-UKGHRSD -ErrorAction SilentlyContinue
         { Get-UKGHRSDRequest -Id 'abc' } | Should -Throw '*Connect-UKGHRSD*'
+    }
+}
+
+Describe 'Get-UKGHRSDErrorMessage' {
+    InModuleScope UKGHRSD {
+        It 'formats an OAuth 2.0 token-endpoint error with error_description' {
+            $body = '{"error":"invalid_client","error_description":"Client authentication failed"}'
+            $err  = [System.Management.Automation.ErrorRecord]::new(
+                [Exception]::new('The remote server returned an error: (401) Unauthorized.'),
+                'FakeId', 'ProtocolError', $null)
+            $err.ErrorDetails = [System.Management.Automation.ErrorDetails]::new($body)
+
+            $msg = Get-UKGHRSDErrorMessage -ErrorRecord $err
+            $msg | Should -Match 'invalid_client: Client authentication failed'
+        }
+
+        It 'formats a bare OAuth error (no error_description)' {
+            $body = '{"error":"invalid_grant"}'
+            $err  = [System.Management.Automation.ErrorRecord]::new(
+                [Exception]::new('bad'), 'FakeId', 'ProtocolError', $null)
+            $err.ErrorDetails = [System.Management.Automation.ErrorDetails]::new($body)
+
+            (Get-UKGHRSDErrorMessage -ErrorRecord $err) | Should -Match 'invalid_grant'
+        }
+
+        It 'still formats the HRSD API {message, errors} shape' {
+            $body = '{"message":"Validation failed","errors":[{"field":"start_date","message":"required"}]}'
+            $err  = [System.Management.Automation.ErrorRecord]::new(
+                [Exception]::new('400 Bad Request'), 'FakeId', 'ProtocolError', $null)
+            $err.ErrorDetails = [System.Management.Automation.ErrorDetails]::new($body)
+
+            $msg = Get-UKGHRSDErrorMessage -ErrorRecord $err
+            $msg | Should -Match 'Validation failed'
+            $msg | Should -Match 'start_date: required'
+        }
+    }
+}
+
+Describe 'Get-UKGHRSDAccessToken error handling' {
+    InModuleScope UKGHRSD {
+        It 'wraps failure with token URL, helper output, and a verify hint' {
+            # We assert the WIRING: Get-UKGHRSDAccessToken must call
+            # Get-UKGHRSDErrorMessage and include its output plus the URL plus
+            # the actionable "Verify..." tail in the thrown message. The helper
+            # itself is covered by the Describe above.
+            Mock Invoke-RestMethod { throw 'network fail' }
+            Mock Get-UKGHRSDErrorMessage { return 'invalid_client: Client authentication failed' }
+
+            $thrown = $null
+            try {
+                Get-UKGHRSDAccessToken -BaseUrl 'https://apis.staging.us.people-doc.com' `
+                    -ApplicationId 'app' -ApplicationSecret 'sec' -ClientId 'cid'
+            } catch { $thrown = $_.Exception.Message }
+
+            $thrown | Should -Match 'apis\.staging\.us\.people-doc\.com/api/v2/client/tokens'
+            $thrown | Should -Match 'invalid_client: Client authentication failed'
+            $thrown | Should -Match 'Verify -Region, -ClientId'
+            Should -Invoke Get-UKGHRSDErrorMessage -Times 1 -Exactly
+        }
     }
 }
 
