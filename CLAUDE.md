@@ -80,14 +80,37 @@ in `form_data`. `Get-UKGHRSDRequestFormData`:
 Output: Label/Value objects (single values collapsed to scalars, multi-value
 kept as arrays).
 
-## OPEN ITEM — verify against a live tenant before publishing
+## OPEN ITEMS — verify against a live tenant before publishing
 
-**The resolver assumes `form_data.field_id` matches the form definition's field
-`slug`.** This held across the spec's examples but was NOT verified against a
-real tenant response — it's the linchpin of the whole custom-field feature. On
-the first live call, pull one real request + its form and confirm the join key.
-The code already falls back to field `id` if `slug` is absent; if the tenant
-keys on `id` instead, it's a small change in `Get-UKGHRSDRequestFormData`.
+1. **`form_data.field_id` == form definition's field `slug`?** Held across the
+   spec's examples but not verified against a real tenant response — linchpin
+   of the whole custom-field feature. On the first live call, pull one real
+   request + its form and confirm the join key. Code already falls back to
+   field `id` if `slug` is absent; if the tenant keys on `id` instead, it's a
+   small change in `Get-UKGHRSDRequestFormData`.
+
+2. `-Region ATL` (UKG-branded / Ultipro platform) → `https://apis.hrsd.ultipro.com`
+   verified live on 2026-09-02. `-Region US`, `EU`, `TOR`, `StagingUS`, `StagingEU`
+   still pending — mappings came from the swagger + inferred patterns for the
+   staging entries.
+
+### Region-picking guidance (learned from the ATL debugging session)
+
+HRSD runs on two distinct platforms and the module surfaces both. Users
+consistently guess wrong on their first connect because the platform their
+tenant lives on isn't obvious from the customer side — the classic failure
+mode is a UKG-branded tenant assuming `-Region US` (People-Doc URL), getting
+a 401, and thinking their credentials are bad.
+
+  - UKG-branded / post-acquisition tenants (the current default for new UKG
+    customers): `-Region ATL` (US) / `-Region TOR` (Canada). Base URL prefix:
+    `apis.hrsd.ultipro`.
+  - Legacy People-Doc-branded tenants: `-Region US` / `-Region EU`. Base URL
+    prefix: `apis.*.people-doc.com`.
+
+The URL prefix from the IPM contact is the definitive tell. README and
+Connect-UKGHRSD comment-based help document this — if you add a new region,
+mirror the guidance in both places.
 
 ## Roadmap (next work)
 

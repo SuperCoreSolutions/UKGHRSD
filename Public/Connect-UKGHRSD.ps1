@@ -14,10 +14,21 @@ function Connect-UKGHRSD {
         your UKG HRSD Project Manager / IPM team.
 
     .PARAMETER Region
-        The HRSD platform your tenant lives on:
-          US, EU            - People-Doc production (US / EU)
-          ATL, TOR          - UKG / Ultipro production (US / Canada)
-          StagingUS, StagingEU - non-production test platforms
+        The HRSD platform your tenant lives on. HRSD runs on two distinct
+        platforms; picking the wrong one 401s even with valid credentials:
+
+          ATL, TOR             - UKG-branded / post-acquisition tenants (US / CA).
+                                 Base URLs: https://apis.hrsd.ultipro.com|ca
+                                 Current default for most UKG customers.
+          US, EU               - Legacy People-Doc-branded tenants (US / EU).
+                                 Base URLs: https://apis.{us|eu}.people-doc.com
+          StagingUS, StagingEU - People-Doc non-production.
+                                 Base URLs: https://apis.staging.{us|eu}.people-doc.com
+
+        Tell them apart by the domain your IPM contact gives you:
+          apis.hrsd.ultipro.{com,ca}   -> ATL / TOR
+          apis.*.people-doc.com        -> US / EU / Staging*
+        When in doubt, ask IPM directly which platform provisioned the tenant.
 
     .PARAMETER Credential
         A PSCredential where UserName = application_id and Password = application_secret.

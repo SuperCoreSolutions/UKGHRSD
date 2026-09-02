@@ -26,10 +26,25 @@ Credentials (`application_id`, `application_secret`, `client_id`) are issued by 
 ```powershell
 # UserName = application_id, Password = application_secret
 $cred = Get-Credential
-Connect-UKGHRSD -Region US -Credential $cred -ClientId 'your-client-id'
+Connect-UKGHRSD -Region ATL -Credential $cred -ClientId 'your-client-id'
 ```
 
-`-Region` values: `US`, `EU` (People-Doc prod), `ATL`, `TOR` (UKG/Ultipro prod), `StagingUS`, `StagingEU`.
+### Picking the right `-Region`
+
+HRSD runs on two distinct platforms. Which one your tenant lives on determines the base URL, and picking the wrong region will fail authentication with a `401` even when the credentials are correct:
+
+| Region | Base URL | When to use it |
+|---|---|---|
+| `ATL` | `https://apis.hrsd.ultipro.com` | UKG-branded / post-acquisition tenants (US) — the current default for most UKG customers |
+| `TOR` | `https://apis.hrsd.ultipro.ca` | UKG-branded tenants (Canada) |
+| `US` | `https://apis.us.people-doc.com` | Legacy People-Doc-branded tenants (US) |
+| `EU` | `https://apis.eu.people-doc.com` | Legacy People-Doc-branded tenants (EU) |
+| `StagingUS` | `https://apis.staging.us.people-doc.com` | People-Doc non-production |
+| `StagingEU` | `https://apis.staging.eu.people-doc.com` | People-Doc non-production |
+
+**How to tell which one you have:** whichever domain the URL your IPM contact gives you starts with — `apis.hrsd.ultipro.com/ca` → `ATL`/`TOR`, `apis.*.people-doc.com` → `US`/`EU`/`Staging*`. When in doubt, ask your IPM contact directly; they know which platform provisioned the tenant.
+
+If your IPM points you at a URL that doesn't match any of the entries above, open an issue with the URL and we'll add a region mapping.
 
 ## Cmdlets
 
