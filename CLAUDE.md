@@ -110,8 +110,9 @@ extending, get schemas from that spec, not third-party mirrors.
 
 ## Housekeeping
 
-- `UKGHRSD.psd1` `ProjectUri`/`LicenseUri` point at `SuperCoreSolutions/UKGHRSD`
-  — update if the real repo path differs.
-- Add an MIT `LICENSE` file (README + manifest reference MIT).
-- Never commit credentials. Use `Get-Credential` / env vars. `.gitignore`
-  should exclude `*.secret` / `*.env`.
+- `UKGHRSD.psd1` `ProjectUri`/`LicenseUri` and the actual repo location both
+  live at `SuperCoreSolutions/UKGHRSD` (LLC GitHub org, confirmed 2026-09-02).
+- MIT `LICENSE` file present at repo root.
+- Never commit credentials. Use `Get-Credential` / env vars. **No `.gitignore`
+  at repo root yet — add one that excludes `*.secret` / `*.env` before the
+  first PSGallery publish.**
