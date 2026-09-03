@@ -26,6 +26,7 @@
         'Disconnect-UKGHRSD'
         'Get-UKGHRSDRequest'
         'Get-UKGHRSDRequestForm'
+        'Get-UKGHRSDRequestFormField'
         'Get-UKGHRSDRequestFormData'
     )
     CmdletsToExport   = @()

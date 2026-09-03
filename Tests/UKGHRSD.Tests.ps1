@@ -30,6 +30,7 @@ Describe 'Module surface' {
             'Disconnect-UKGHRSD'
             'Get-UKGHRSDRequest'
             'Get-UKGHRSDRequestForm'
+            'Get-UKGHRSDRequestFormField'
             'Get-UKGHRSDRequestFormData'
         )
         $actual = (Get-Command -Module UKGHRSD).Name | Sort-Object
@@ -277,6 +278,81 @@ Describe 'Get-UKGHRSDRequestForm -Name lookup' {
         It '-Id and -Name are mutually exclusive via parameter sets' {
             Mock Invoke-UKGHRSDRequest { }
             { Get-UKGHRSDRequestForm -Id 'x' -Name 'y' } |
+                Should -Throw '*Parameter set cannot be resolved*'
+        }
+    }
+}
+
+Describe 'Get-UKGHRSDRequestFormField' {
+    InModuleScope UKGHRSD {
+        BeforeEach {
+            $script:sampleForm = [pscustomobject]@{
+                id              = 'time-off-accruals'
+                name            = 'Time Off & Accruals'
+                form_definition = [pscustomobject]@{
+                    fields = @(
+                        [pscustomobject]@{ slug = 'start-date'; label = 'Start date'; type_id = 'date'; required = $true }
+                        [pscustomobject]@{ slug = 'reason';     label = 'Reason';     type_id = 'dropdown'; required = $false; items = @(
+                            [pscustomobject]@{ label = 'PTO'; value = 'pto' }
+                            [pscustomobject]@{ label = 'Sick'; value = 'sick' }
+                        )}
+                        # A field with no slug -- falls back to id.
+                        [pscustomobject]@{ id = 'fallback-id'; label = 'Legacy field'; type_id = 'text'; required = $false }
+                    )
+                }
+            }
+        }
+
+        It '-FormId calls Get-UKGHRSDRequestForm -Id and emits one object per field' {
+            Mock Get-UKGHRSDRequestForm { $script:sampleForm }
+
+            $r = @(Get-UKGHRSDRequestFormField -FormId 'time-off-accruals')
+
+            $r.Count | Should -Be 3
+            Should -Invoke Get-UKGHRSDRequestForm -Times 1 -Exactly -ParameterFilter { $Id -eq 'time-off-accruals' }
+            $r[0].FormId | Should -Be 'time-off-accruals'
+            $r[0].Slug   | Should -Be 'start-date'
+            $r[0].Label  | Should -Be 'Start date'
+            $r[0].TypeId | Should -Be 'date'
+        }
+
+        It '-FormName defaults LanguageCode to en-us' {
+            Mock Get-UKGHRSDRequestForm { $script:sampleForm }
+
+            Get-UKGHRSDRequestFormField -FormName 'Time Off & Accruals' | Out-Null
+
+            Should -Invoke Get-UKGHRSDRequestForm -Times 1 -Exactly -ParameterFilter {
+                $Name -eq 'Time Off & Accruals' -and $LanguageCode -eq 'en-us'
+            }
+        }
+
+        It 'piped form object does NOT call Get-UKGHRSDRequestForm' {
+            Mock Get-UKGHRSDRequestForm { throw 'should not be called' }
+
+            $r = @($script:sampleForm | Get-UKGHRSDRequestFormField)
+
+            $r.Count | Should -Be 3
+            Should -Invoke Get-UKGHRSDRequestForm -Times 0 -Exactly
+        }
+
+        It '-Required emits only fields where required = true' {
+            $r = @($script:sampleForm | Get-UKGHRSDRequestFormField -Required)
+
+            $r.Count | Should -Be 1
+            $r[0].Slug     | Should -Be 'start-date'
+            $r[0].Required | Should -BeTrue
+        }
+
+        It 'falls back to field.id as Slug when field.slug is absent' {
+            $r = @($script:sampleForm | Get-UKGHRSDRequestFormField)
+
+            $fallback = $r | Where-Object Label -eq 'Legacy field'
+            $fallback.Slug | Should -Be 'fallback-id'
+        }
+
+        It '-FormId and -FormName are mutually exclusive via parameter sets' {
+            Mock Get-UKGHRSDRequestForm { }
+            { Get-UKGHRSDRequestFormField -FormId 'x' -FormName 'y' } |
                 Should -Throw '*Parameter set cannot be resolved*'
         }
     }

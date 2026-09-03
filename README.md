@@ -56,6 +56,7 @@ HRSD runs on two distinct platforms. Which one your tenant lives on determines t
 | [`Disconnect-UKGHRSD`](#disconnect-ukghrsd) | Clear the session, optionally revoke the token server-side |
 | [`Get-UKGHRSDRequest`](#get-ukghrsdrequest) | List/search requests, or fetch one by internal UUID / portal number |
 | [`Get-UKGHRSDRequestForm`](#get-ukghrsdrequestform) | Retrieve request form definitions (field labels/types); fetch one by `-Id` (slug) or `-Name` (display name, e.g. "Time Off & Accruals") |
+| [`Get-UKGHRSDRequestFormField`](#get-ukghrsdrequestformfield) | List the fields of a form as curated `Slug` / `Label` / `TypeId` / `Required` objects — handy for scripting form submissions |
 | [`Get-UKGHRSDRequestFormData`](#get-ukghrsdrequestformdata) | Resolve a request's answers into readable label/value pairs |
 
 Every cmdlet also carries full comment-based help — `Get-Help <Cmdlet> -Full` in PowerShell shows synopsis, per-parameter descriptions, and worked examples.
@@ -148,6 +149,30 @@ Wraps `GET /request_forms` (list & search) and `GET /request_forms/{id}` (detail
 <a id="get-ukghrsdrequestform-notes"></a>
 **Note on `-Id` vs `-Name`:** `-Id` takes the internal slug (`time-off-accruals`) and hits `/request_forms/{id}` directly. `-Name` takes the display name (`'Time Off & Accruals'`) — the API has no dedicated name filter, so under the hood the cmdlet runs a full-text search (`q=<name>`) and narrows client-side to the record whose `name` matches exactly. Because the API requires `language_code` alongside `q=`, `-Name` defaults it to `en-us`; pass `-LanguageCode` explicitly if your tenant's forms are indexed in a different language. Throws with a helpful message if 0 or >1 exact matches come back.
 
+### Get-UKGHRSDRequestFormField
+
+Lists the fields of a request form as a curated object per field. Wraps the awkward `(Get-UKGHRSDRequestForm -Name '...').form_definition.fields` pattern into a first-class cmdlet, flattens the useful properties out of the nested Formidable/FaaS shape, and hides the noise (`accesses`, `autofill_*`, internal ids). Handy for scripting form submissions — you can see at a glance which fields exist, which are required, and what choices dropdowns/radios have.
+
+**Output object shape:** `FormId`, `Slug`, `Label`, `TypeId`, `Required`, `Multiple`, `Description`, `Placeholder`, `Items`, `Defaults`, `Validations`, `Raw` (see note below).
+
+**Input** (mutually exclusive):
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `-Form` | `pscustomobject` | yes (ByObject set) | A form object as returned by `Get-UKGHRSDRequestForm`. Accepts pipeline input. Skips the extra API call the other paths make. |
+| `-FormId` | `string` | yes (ById set) | Retrieve the form by internal slug (e.g. `time-off-accruals`), then enumerate fields. |
+| `-FormName` | `string` | yes (ByName set) | Retrieve the form by display name (e.g. `'Time Off & Accruals'`), then enumerate fields. Aliased as `-Name`. |
+
+**Common:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `-LanguageCode` | `string` | Only valid with `-FormName`. Defaults to `en-us`. |
+| `-RawFaasFormat` | `switch` | Passed through to `Get-UKGHRSDRequestForm`. The curated top-level properties handle both formats; only the `.Raw` property changes shape. |
+| `-Required` | `switch` | Emit only fields where `required = $true`. |
+
+**Note on the `.Raw` property:** each emitted object carries the original field dictionary on `.Raw` — so if you need access to `accesses`, `autofill_*`, FaaS-specific keys, or anything the curated shape drops, it's still there. Example: `(Get-UKGHRSDRequestFormField -FormName 'Time Off & Accruals')[0].Raw.accesses`.
+
 ### Get-UKGHRSDRequestFormData
 
 Joins a request's raw `form_data` (`{field_id, values}` pairs) to its form's field definitions to produce readable `Label` / `Value` output. Form definitions are cached per `form_id` for the duration of the call, so resolving a batch of requests that share a form fetches each form definition once.
@@ -197,6 +222,14 @@ Get-UKGHRSDRequestForm -Name 'Time Off & Accruals'
 
 # All forms in a category
 Get-UKGHRSDRequestForm -CategoryId 'hr-lifecycle'
+
+# List the fields of a form (see what you have to fill in)
+Get-UKGHRSDRequestForm -Name 'Time Off & Accruals' |
+    Get-UKGHRSDRequestFormField |
+    Format-Table Slug, Label, TypeId, Required -AutoSize
+
+# Only the required fields
+Get-UKGHRSDRequestFormField -FormName 'Time Off & Accruals' -Required
 
 # --- Form-data resolution (the core value) ---
 
