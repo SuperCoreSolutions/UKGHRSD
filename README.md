@@ -8,7 +8,7 @@ Common use cases include offboarding automation, HR-request reporting, and pulli
 
 Companion to the separate [UKGPro](../UKGPro) module (which covers UKG Pro HCM). The two are intentionally separate: different platform, authentication, and base URL.
 
-> Status: pre-release (v0.1.0). Read-only surface: `Connect` + five `Get-` cmdlets, plus the form-data resolver. Write cmdlets (`Set-`/`New-`) and PSGallery publish to follow after live-tenant validation of the remaining regions.
+> Status: v0.2.0 — prepared for first PowerShell Gallery release. Read-only surface: `Connect`/`Disconnect` + four `Get-` cmdlets (including the form-data resolver). Write cmdlets (`Set-`/`New-`) planned for a later release; `-Region ATL` (UKG-Ultipro US) is the only region live-verified so far.
 
 ## Install
 

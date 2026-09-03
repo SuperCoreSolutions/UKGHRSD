@@ -38,7 +38,7 @@ function Get-UKGHRSDErrorMessage {
     $response = $ErrorRecord.Exception.Response
     if ($response) {
         # HTTP status differs slightly between PS 5.1 (StatusCode enum) and PS 7.
-        try { $status = [int]$response.StatusCode } catch { }
+        try { $status = [int]$response.StatusCode } catch { Write-Debug "StatusCode cast failed: $_" }
 
         # PS 5.1 fallback: body isn't on ErrorDetails, read the response stream.
         if (-not $bodyText -and $response.GetResponseStream) {
@@ -48,7 +48,7 @@ function Get-UKGHRSDErrorMessage {
                 $bodyText = $reader.ReadToEnd()
                 $reader.Dispose()
             }
-            catch { }
+            catch { Write-Debug "Response stream read failed: $_" }
         }
     }
 

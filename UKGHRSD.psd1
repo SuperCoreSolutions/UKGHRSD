@@ -3,7 +3,7 @@
     RootModule        = 'UKGHRSD.psm1'
 
     # Version number of this module. Bump per release (SemVer) before publishing.
-    ModuleVersion     = '0.1.0'
+    ModuleVersion     = '0.2.0'
 
     # Supported PowerShell editions. Desktop = Windows PowerShell 5.1, Core = PS 7+.
     CompatiblePSEditions = @('Desktop', 'Core')
@@ -38,7 +38,32 @@
             Tags         = @('UKG', 'HRSD', 'HR-Service-Delivery', 'PeopleDoc', 'Offboarding', 'REST', 'IAM')
             LicenseUri   = 'https://github.com/SuperCoreSolutions/UKGHRSD/blob/main/LICENSE'
             ProjectUri   = 'https://github.com/SuperCoreSolutions/UKGHRSD'
-            ReleaseNotes = 'Initial scaffold: OAuth connect/disconnect and read-only (Get) cmdlets for requests and request forms.'
+            ReleaseNotes = @'
+v0.2.0 - First PowerShell Gallery release.
+
+Cmdlets: Connect-UKGHRSD / Disconnect-UKGHRSD (OAuth 2.0
+client_credentials with automatic token refresh, six regions across
+UKG-Ultipro ATL/TOR and legacy People-Doc US/EU/StagingUS/StagingEU),
+Get-UKGHRSDRequest (list/search plus -Id UUID and -RequestNumber
+portal-number lookups), Get-UKGHRSDRequestForm (list/search plus -Id
+slug and -Name display-name lookups), Get-UKGHRSDRequestFormField
+(curated field enumeration -- promotes Slug / Label / TypeId /
+Required from the nested Formidable-or-FaaS shape, hides accesses
+and autofill noise), Get-UKGHRSDRequestFormData (resolves opaque
+form_data {field_id, values} pairs into readable Label/Value output
+-- the core value proposition for offboarding workflows).
+
+Cursor-based pagination on list endpoints (Next-Cursor header).
+OAuth 2.0 error bodies (invalid_client, invalid_grant, etc.) are
+surfaced in exception messages instead of being swallowed to a bare
+401. Region-picking guidance in help text and README to steer users
+between the UKG-branded (apis.hrsd.ultipro.*) and People-Doc-branded
+(apis.*.people-doc.com) platforms.
+
+Live-verified: -Region ATL on 2026-09-02, plus end-to-end
+form-data resolver against an ATL prod tenant. Other regions (US,
+EU, TOR, StagingUS, StagingEU) inferred from the OpenAPI spec.
+'@
         }
     }
 }
