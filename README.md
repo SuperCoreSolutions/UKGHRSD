@@ -52,7 +52,7 @@ If your IPM points you at a URL that doesn't match any of the entries above, ope
 |---|---|
 | `Connect-UKGHRSD` | Authenticate and open a session |
 | `Disconnect-UKGHRSD` | Clear the session (optionally revoke the token) |
-| `Get-UKGHRSDRequest` | List/search requests, or get one by `-Id` |
+| `Get-UKGHRSDRequest` | List/search requests, or fetch one by `-Id` (internal UUID) / `-RequestNumber` (portal number, e.g. 6678) |
 | `Get-UKGHRSDRequestForm` | Get form definitions (field labels/types) |
 | `Get-UKGHRSDRequestFormData` | Resolve a request's answers into label/value pairs |
 
@@ -70,7 +70,12 @@ Get-UKGHRSDRequest -FormId 'offboarding' -Status opened,pending -Embed employee 
 Get-UKGHRSDRequest -FormId 'offboarding' -Status opened |
     Get-UKGHRSDRequestFormData |
     Where-Object Label -match 'credit card'
+
+# Look up one request by the number shown in the UKG admin portal
+Get-UKGHRSDRequest -RequestNumber 6678
 ```
+
+**`-Id` vs `-RequestNumber`:** the number displayed in the UKG portal (e.g. `6678`) is `request_number`; the API's `/requests/{id}` detail endpoint takes a separate internal UUID (`id`). Pass the UUID to `-Id`; pass the portal number to `-RequestNumber` (which uses the API's full-text search under the hood and narrows to an exact match).
 
 ## How custom-field resolution works
 

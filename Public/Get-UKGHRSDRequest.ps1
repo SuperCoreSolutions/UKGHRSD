@@ -15,7 +15,17 @@ function Get-UKGHRSDRequest {
         Get-UKGHRSDRequestFormData.
 
     .PARAMETER Id
-        Retrieve a single request by its unique ID.
+        Retrieve a single request by its internal UUID (the `id` field on a
+        request object — not the human-readable number displayed in the UKG
+        admin portal). To look one up by the portal number, use
+        -RequestNumber instead.
+
+    .PARAMETER RequestNumber
+        Retrieve a single request by the human-readable number shown in the
+        UKG admin portal (e.g. 6678). The API has no dedicated filter for
+        this field, so the module runs a full-text query (`q=<n>`) against
+        /requests and returns the item whose `request_number` matches
+        exactly. Throws if 0 or >1 exact matches come back.
 
     .PARAMETER Status
         Filter by one or more statuses: created, opened, pending, closed, archived.
@@ -68,7 +78,12 @@ function Get-UKGHRSDRequest {
     .EXAMPLE
         Get-UKGHRSDRequest -Id '0a2f5401-5e63-4f8e-9da0-eceabc557905'
 
-        Retrieves a single request by ID.
+        Retrieves a single request by its internal UUID.
+
+    .EXAMPLE
+        Get-UKGHRSDRequest -RequestNumber 6678
+
+        Retrieves a single request by the portal-visible number.
 
     .EXAMPLE
         Get-UKGHRSDRequest -Status opened -CreatedSince (Get-Date).AddDays(-7)
@@ -81,6 +96,10 @@ function Get-UKGHRSDRequest {
         [Parameter(Mandatory, ParameterSetName = 'ById', ValueFromPipelineByPropertyName)]
         [Alias('request_id')]
         [string]$Id,
+
+        [Parameter(Mandatory, ParameterSetName = 'ByRequestNumber', ValueFromPipelineByPropertyName)]
+        [Alias('request_number')]
+        [int]$RequestNumber,
 
         [Parameter(ParameterSetName = 'List')]
         [ValidateSet('created', 'opened', 'pending', 'closed', 'archived')]
@@ -136,10 +155,35 @@ function Get-UKGHRSDRequest {
 
     process {
         if ($PSCmdlet.ParameterSetName -eq 'ById') {
+            # The API's /requests/{id} takes the internal UUID. A caller who
+            # passes the portal-visible number (all digits) gets a bare 404
+            # from UKG that doesn't point at the right cmdlet -- catch that
+            # here and steer them to -RequestNumber.
+            if ($Id -match '^\d+$') {
+                throw "-Id '$Id' looks like a request number, not a UUID. The API's /requests/{id} endpoint takes the internal UUID ('id' field on a request object). To look up by the number shown in the UKG portal, use: Get-UKGHRSDRequest -RequestNumber $Id"
+            }
             $q = @{}
             if ($Embed) { $q['embed'] = $Embed }
             Invoke-UKGHRSDRequest -Method Get -Path "/requests/$Id" -Query $q -NoPaging
             return
+        }
+
+        if ($PSCmdlet.ParameterSetName -eq 'ByRequestNumber') {
+            # /requests has no request_number filter, only full-text q. Query
+            # then narrow client-side to an exact numeric match -- q is fuzzy
+            # and can match subjects/bodies that happen to contain the number.
+            $q = @{ q = [string]$RequestNumber }
+            if ($Embed) { $q['embed'] = $Embed }
+            $candidates = @(Invoke-UKGHRSDRequest -Method Get -Path '/requests' -Query $q)
+            $exact      = @($candidates | Where-Object { $_.request_number -eq $RequestNumber })
+
+            if ($exact.Count -eq 0) {
+                throw "No request found with request_number = $RequestNumber."
+            }
+            if ($exact.Count -gt 1) {
+                throw "Multiple requests ($($exact.Count)) matched request_number = $RequestNumber. This shouldn't happen and likely indicates duplicate data on the tenant side; inspect the raw results with Get-UKGHRSDRequest -Query '$RequestNumber'."
+            }
+            return $exact[0]
         }
 
         # List: assemble query params only for those the caller supplied.

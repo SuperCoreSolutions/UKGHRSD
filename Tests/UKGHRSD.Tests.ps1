@@ -122,6 +122,87 @@ Describe 'Get-UKGHRSDAccessToken error handling' {
     }
 }
 
+Describe 'Get-UKGHRSDRequest -Id vs -RequestNumber' {
+    InModuleScope UKGHRSD {
+        BeforeEach {
+            # Session must exist so the connect-first check doesn't fire.
+            $script:UKGHRSDSession = [pscustomobject]@{
+                BaseUrl     = 'https://apis.hrsd.ultipro.com'
+                AccessToken = 'fake-token'
+                ExpiresAt   = (Get-Date).AddHours(1)
+            }
+            $script:calls = New-Object 'System.Collections.Generic.List[hashtable]'
+        }
+
+        It '-Id with an all-digit value throws with a -RequestNumber hint and makes no API call' {
+            Mock Invoke-UKGHRSDRequest { $script:calls.Add(@{ Path = $Path }) }
+
+            { Get-UKGHRSDRequest -Id '6678' } |
+                Should -Throw "*looks like a request number*Get-UKGHRSDRequest -RequestNumber 6678*"
+
+            $script:calls.Count | Should -Be 0
+        }
+
+        It '-Id with a UUID hits /requests/{uuid} normally' {
+            Mock Invoke-UKGHRSDRequest {
+                $script:calls.Add(@{ Path = $Path; Query = $Query })
+                [pscustomobject]@{ id = $Path.Split('/')[-1]; request_number = 6678 }
+            }
+
+            Get-UKGHRSDRequest -Id '0a2f5401-5e63-4f8e-9da0-eceabc557905' | Out-Null
+
+            $script:calls.Count       | Should -Be 1
+            $script:calls[0].Path     | Should -Be '/requests/0a2f5401-5e63-4f8e-9da0-eceabc557905'
+        }
+
+        It '-RequestNumber issues a q= search and returns the exact match when there is one' {
+            Mock Invoke-UKGHRSDRequest {
+                $script:calls.Add(@{ Path = $Path; Query = $Query })
+                @(
+                    [pscustomobject]@{ id = 'uuid-a'; request_number = 6678; subject = 'Report Request' }
+                )
+            }
+
+            $r = Get-UKGHRSDRequest -RequestNumber 6678
+
+            $script:calls.Count       | Should -Be 1
+            $script:calls[0].Path     | Should -Be '/requests'
+            $script:calls[0].Query.q  | Should -Be '6678'
+            $r.id                     | Should -Be 'uuid-a'
+            $r.request_number         | Should -Be 6678
+        }
+
+        It '-RequestNumber narrows fuzzy q matches to the exact request_number' {
+            # q is full-text and can return items whose subject/body just
+            # contains the number. Assert we filter to the exact match.
+            Mock Invoke-UKGHRSDRequest {
+                @(
+                    [pscustomobject]@{ id = 'uuid-a'; request_number = 6678; subject = 'The one we want' }
+                    [pscustomobject]@{ id = 'uuid-b'; request_number = 9999; subject = 'Ticket 6678 mentioned in body' }
+                )
+            }
+
+            $r = Get-UKGHRSDRequest -RequestNumber 6678
+
+            $r.id             | Should -Be 'uuid-a'
+            $r.request_number | Should -Be 6678
+        }
+
+        It '-RequestNumber throws when no exact match is found' {
+            Mock Invoke-UKGHRSDRequest { @() }
+
+            { Get-UKGHRSDRequest -RequestNumber 6678 } |
+                Should -Throw '*No request found with request_number = 6678*'
+        }
+
+        It '-Id and -RequestNumber are mutually exclusive via parameter sets' {
+            Mock Invoke-UKGHRSDRequest { }
+            { Get-UKGHRSDRequest -Id 'uuid' -RequestNumber 6678 } |
+                Should -Throw '*Parameter set cannot be resolved*'
+        }
+    }
+}
+
 Describe 'form_data resolution' {
     InModuleScope UKGHRSD {
         It 'joins field_id answers to their form labels' {
