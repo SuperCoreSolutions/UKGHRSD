@@ -17,12 +17,15 @@ retrieve") into readable label/value output.
 
 Distribution goal: GitHub source repo + publish to the PowerShell Gallery.
 
-## Current state (v0.2.0 — prepared for first PSGallery release)
+## Current state (v0.2.0)
 
-30 Pester tests passing on PS 7.5.1, zero PSScriptAnalyzer findings under the
-PSGallery ruleset (gated by the build script). `-Region ATL` (UKG-Ultipro US)
-verified end-to-end against a prod tenant on 2026-09-02, including the
-form-data resolver. Other regions still inferred from swagger + patterns.
+**Published to PSGallery**:
+https://www.powershellgallery.com/packages/UKGHRSD (first release,
+2026-09-03). 30 Pester tests passing on PS 7.5.1, zero PSScriptAnalyzer
+findings under the PSGallery ruleset (gated by the build script).
+`-Region ATL` (UKG-Ultipro US) verified end-to-end against a prod tenant
+on 2026-09-02, including the form-data resolver. Other regions still
+inferred from swagger + patterns.
 
 Built and working:
 - `Connect-UKGHRSD` / `Disconnect-UKGHRSD` — OAuth 2.0 client_credentials with

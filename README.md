@@ -1,5 +1,8 @@
 # UKGHRSD
 
+[![PowerShell Gallery Version](https://img.shields.io/powershellgallery/v/UKGHRSD?label=PSGallery&color=0072C6)](https://www.powershellgallery.com/packages/UKGHRSD)
+[![PowerShell Gallery Downloads](https://img.shields.io/powershellgallery/dt/UKGHRSD?label=downloads&color=success)](https://www.powershellgallery.com/packages/UKGHRSD)
+[![PowerShell Gallery Platform](https://img.shields.io/powershellgallery/p/UKGHRSD)](https://www.powershellgallery.com/packages/UKGHRSD)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A PowerShell module wrapping the **UKG HR Service Delivery (HRSD)** REST API v2 (People-Doc / Ultipro platforms). Provides typed `Get-` cmdlets for reading **People Assist requests** — for example, manager-submitted **offboarding** requests — with a shared OAuth `client_credentials` auth layer, cursor-based pagination, and a **form-data resolver** that turns opaque `{ field_id, values }` answers into readable `Label` / `Value` pairs so callers work with real field names instead of GUIDs.
@@ -8,15 +11,21 @@ Common use cases include offboarding automation, HR-request reporting, and pulli
 
 Companion to the separate [UKGPro](../UKGPro) module (which covers UKG Pro HCM). The two are intentionally separate: different platform, authentication, and base URL.
 
-> Status: v0.2.0 — prepared for first PowerShell Gallery release. Read-only surface: `Connect`/`Disconnect` + four `Get-` cmdlets (including the form-data resolver). Write cmdlets (`Set-`/`New-`) planned for a later release; `-Region ATL` (UKG-Ultipro US) is the only region live-verified so far.
+> Status: v0.2.0 — [live on PowerShell Gallery](https://www.powershellgallery.com/packages/UKGHRSD). Read-only surface: `Connect`/`Disconnect` + four `Get-` cmdlets (including the form-data resolver). Write cmdlets (`Set-`/`New-`) planned for a later release; `-Region ATL` (UKG-Ultipro US) is the only region live-verified so far.
 
 ## Install
 
-Not yet on PowerShell Gallery. Install from source:
+Install from [PowerShell Gallery](https://www.powershellgallery.com/packages/UKGHRSD):
 
 ```powershell
-git clone https://github.com/SuperCoreSolutions/UKGHRSD.git
-Import-Module ./UKGHRSD/UKGHRSD.psd1
+Install-Module UKGHRSD -Scope CurrentUser
+Import-Module UKGHRSD
+```
+
+Later, to upgrade to the newest published version:
+
+```powershell
+Update-Module UKGHRSD
 ```
 
 Requires PowerShell 5.1+ or 7+.
@@ -127,7 +136,7 @@ Wraps `GET /request_forms` (list & search) and `GET /request_forms/{id}` (detail
 | `-CategoryId` | `string` | Filter forms by category slug. |
 | `-IsDefault` | `bool` | Filter by the `is_default` attribute. Serialized as lowercase (`true` / `false`). |
 | `-Featured` | `bool` | Filter by the `featured` attribute. Serialized as lowercase. |
-| `-LanguageCode` | `string` | Filter forms by language. Required when using `-Query`. |
+| `-LanguageCode` | `string` | Filter forms by language. Required when using `-Query`; also accepted alongside `-Name` (defaults to `en-us` there — see the [`-Id` vs `-Name` note](#get-ukghrsdrequestform-notes) below). |
 | `-Query` | `string` | Full-text search on forms. Requires `-LanguageCode`. Aliased as `-q`. |
 | `-EmployeeId` | `string` | Filter to forms visible to a specific employee. |
 | `-Sort` | `+title` \| `-title` \| `+last_hits` \| `-last_hits` | Sort order. |
@@ -277,7 +286,7 @@ Tests mock the HTTP layer, so they run with no network and no live tenant.
 - **Write cmdlets:** `New-UKGHRSDRequest`, `Set-UKGHRSDRequest`, comments, attachments. `Invoke-UKGHRSDRequest` already supports POST/PATCH with a JSON body.
 - **Additional read cmdlets:** employees, documents, processes/tasks — as offboarding workflows demand them.
 - **Live-tenant validation** of the remaining regions (`ATL` verified 2026-09-02; `US`, `EU`, `TOR`, `StagingUS`, `StagingEU` still inferred from swagger + patterns).
-- **First-class PowerShell Gallery release** once the read surface is broad enough to be useful out-of-the-box and every shipped cmdlet has been live-tenant validated.
+- **A 1.0.0 release** once every shipped region has been live-tenant validated.
 
 ## License
 
