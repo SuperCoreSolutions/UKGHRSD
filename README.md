@@ -55,7 +55,7 @@ HRSD runs on two distinct platforms. Which one your tenant lives on determines t
 | [`Connect-UKGHRSD`](#connect-ukghrsd) | Open an authenticated session (OAuth `client_credentials`) |
 | [`Disconnect-UKGHRSD`](#disconnect-ukghrsd) | Clear the session, optionally revoke the token server-side |
 | [`Get-UKGHRSDRequest`](#get-ukghrsdrequest) | List/search requests, or fetch one by internal UUID / portal number |
-| [`Get-UKGHRSDRequestForm`](#get-ukghrsdrequestform) | Retrieve request form definitions (field labels/types) |
+| [`Get-UKGHRSDRequestForm`](#get-ukghrsdrequestform) | Retrieve request form definitions (field labels/types); fetch one by `-Id` (slug) or `-Name` (display name, e.g. "Time Off & Accruals") |
 | [`Get-UKGHRSDRequestFormData`](#get-ukghrsdrequestformdata) | Resolve a request's answers into readable label/value pairs |
 
 Every cmdlet also carries full comment-based help — `Get-Help <Cmdlet> -Full` in PowerShell shows synopsis, per-parameter descriptions, and worked examples.
@@ -132,17 +132,21 @@ Wraps `GET /request_forms` (list & search) and `GET /request_forms/{id}` (detail
 | `-Sort` | `+title` \| `-title` \| `+last_hits` \| `-last_hits` | Sort order. |
 | `-MaxResults` | `int` | Cap total records across all pages. `0` = no cap. Default: `0`. |
 
-**Single-form lookup:**
+**Single-form lookup** (mutually exclusive with each other and with list filters):
 
 | Parameter | Type | Description |
 |---|---|---|
-| `-Id` | `string` | Retrieve one form by its slug (e.g. `offboarding`). |
+| `-Id` | `string` | Retrieve one form by its internal slug (e.g. `offboarding`, `time-off-accruals`). |
+| `-Name` | `string` | Retrieve one form by its display name (case-insensitive exact match, e.g. `'Time Off & Accruals'`). See the [`-Id` vs `-Name` note](#get-ukghrsdrequestform-notes) below. |
 
 **Common:**
 
 | Parameter | Type | Description |
 |---|---|---|
 | `-RawFaasFormat` | `switch` | Return `form_definition` in its original FaaS format (adds `f=1` to the query). Without this switch, the API converts FaaS forms to the newer Formidable format. |
+
+<a id="get-ukghrsdrequestform-notes"></a>
+**Note on `-Id` vs `-Name`:** `-Id` takes the internal slug (`time-off-accruals`) and hits `/request_forms/{id}` directly. `-Name` takes the display name (`'Time Off & Accruals'`) — the API has no dedicated name filter, so under the hood the cmdlet runs a full-text search (`q=<name>`) and narrows client-side to the record whose `name` matches exactly. Because the API requires `language_code` alongside `q=`, `-Name` defaults it to `en-us`; pass `-LanguageCode` explicitly if your tenant's forms are indexed in a different language. Throws with a helpful message if 0 or >1 exact matches come back.
 
 ### Get-UKGHRSDRequestFormData
 
@@ -185,8 +189,11 @@ Get-UKGHRSDRequest -UpdatedSince (Get-Date).AddDays(-1)
 
 # --- Forms ---
 
-# One form definition (with its field list)
+# One form definition by slug
 Get-UKGHRSDRequestForm -Id 'offboarding'
+
+# Same form, by the display name shown in the UKG admin portal
+Get-UKGHRSDRequestForm -Name 'Time Off & Accruals'
 
 # All forms in a category
 Get-UKGHRSDRequestForm -CategoryId 'hr-lifecycle'

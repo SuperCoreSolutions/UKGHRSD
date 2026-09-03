@@ -12,7 +12,20 @@ function Get-UKGHRSDRequestForm {
         raw answers into readable label/value output.
 
     .PARAMETER Id
-        Retrieve a single request form by its ID (slug).
+        Retrieve a single request form by its internal ID (slug — e.g.
+        `time-off-accruals`). To look one up by the human-readable name
+        shown in the UKG admin portal (e.g. "Time Off & Accruals"), use
+        -Name instead.
+
+    .PARAMETER Name
+        Retrieve a single request form by its display name (case-insensitive
+        exact match against the `name` field). The API has no dedicated
+        filter for this, so the module runs a full-text query (`q=<n>`)
+        against /request_forms and returns the item whose `name` matches
+        exactly. Throws if 0 or >1 exact matches come back. `-LanguageCode`
+        is required by the API when using `q=`; the -Name path defaults it
+        to `en-us` — pass -LanguageCode explicitly if your tenant's forms
+        are indexed in a different language.
 
     .PARAMETER CategoryId
         Filter forms by category slug.
@@ -45,7 +58,18 @@ function Get-UKGHRSDRequestForm {
     .EXAMPLE
         Get-UKGHRSDRequestForm -Id 'offboarding'
 
-        Retrieves the offboarding form definition, including its field list.
+        Retrieves the offboarding form definition by slug, including its field list.
+
+    .EXAMPLE
+        Get-UKGHRSDRequestForm -Name 'Time Off & Accruals'
+
+        Retrieves the form whose display name matches exactly, using the
+        API's full-text search with language_code=en-us by default.
+
+    .EXAMPLE
+        Get-UKGHRSDRequestForm -Name 'ConfÃ©s payÃ©s' -LanguageCode 'fr-fr'
+
+        Same lookup on a non-English tenant.
 
     .EXAMPLE
         Get-UKGHRSDRequestForm -CategoryId 'hr-lifecycle'
@@ -59,6 +83,10 @@ function Get-UKGHRSDRequestForm {
         [Alias('form_id')]
         [string]$Id,
 
+        [Parameter(Mandatory, ParameterSetName = 'ByName')]
+        [Alias('title')]
+        [string]$Name,
+
         [Parameter(ParameterSetName = 'List')]
         [string]$CategoryId,
 
@@ -69,6 +97,7 @@ function Get-UKGHRSDRequestForm {
         [bool]$Featured,
 
         [Parameter(ParameterSetName = 'List')]
+        [Parameter(ParameterSetName = 'ByName')]
         [string]$LanguageCode,
 
         [Parameter(ParameterSetName = 'List')]
@@ -95,6 +124,33 @@ function Get-UKGHRSDRequestForm {
             if ($RawFaasFormat) { $q['f'] = '1' }
             Invoke-UKGHRSDRequest -Method Get -Path "/request_forms/$Id" -Query $q -NoPaging
             return
+        }
+
+        if ($PSCmdlet.ParameterSetName -eq 'ByName') {
+            # /request_forms has no dedicated name filter, only full-text q,
+            # which UKG additionally requires be paired with language_code.
+            # Default to en-us so the common case is a one-liner; overridable
+            # via -LanguageCode for non-English tenants. Then narrow client-side
+            # to items whose display name matches exactly (case-insensitive) --
+            # q is fuzzy and can return unrelated forms whose keywords or
+            # descriptions happen to contain the same words.
+            $lang = if ($LanguageCode) { $LanguageCode } else { 'en-us' }
+            $q = @{
+                q             = $Name
+                language_code = $lang
+            }
+            if ($RawFaasFormat) { $q['f'] = '1' }
+
+            $candidates = @(Invoke-UKGHRSDRequest -Method Get -Path '/request_forms' -Query $q)
+            $exact      = @($candidates | Where-Object { $_.name -eq $Name })
+
+            if ($exact.Count -eq 0) {
+                throw "No request form found with name = '$Name' (searched in language '$lang'). If your tenant's forms are indexed in a different language, pass -LanguageCode explicitly."
+            }
+            if ($exact.Count -gt 1) {
+                throw "Multiple request forms ($($exact.Count)) matched name = '$Name'. Inspect the raw results with: Get-UKGHRSDRequestForm -Query '$Name' -LanguageCode '$lang'"
+            }
+            return $exact[0]
         }
 
         if ($Query -and -not $LanguageCode) {

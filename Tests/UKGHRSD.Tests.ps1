@@ -203,6 +203,85 @@ Describe 'Get-UKGHRSDRequest -Id vs -RequestNumber' {
     }
 }
 
+Describe 'Get-UKGHRSDRequestForm -Name lookup' {
+    InModuleScope UKGHRSD {
+        BeforeEach {
+            $script:UKGHRSDSession = [pscustomobject]@{
+                BaseUrl     = 'https://apis.hrsd.ultipro.com'
+                AccessToken = 'fake-token'
+                ExpiresAt   = (Get-Date).AddHours(1)
+            }
+            $script:calls = New-Object 'System.Collections.Generic.List[hashtable]'
+        }
+
+        It '-Name issues a q= search with default language en-us and returns the exact-name match' {
+            Mock Invoke-UKGHRSDRequest {
+                $script:calls.Add(@{ Path = $Path; Query = $Query })
+                @(
+                    [pscustomobject]@{ id = 'time-off-accruals'; name = 'Time Off & Accruals'; category_id = 'hr' }
+                )
+            }
+
+            $r = Get-UKGHRSDRequestForm -Name 'Time Off & Accruals'
+
+            $script:calls.Count             | Should -Be 1
+            $script:calls[0].Path           | Should -Be '/request_forms'
+            $script:calls[0].Query.q        | Should -Be 'Time Off & Accruals'
+            $script:calls[0].Query.language_code | Should -Be 'en-us'
+            $r.id                           | Should -Be 'time-off-accruals'
+        }
+
+        It '-Name -LanguageCode overrides the en-us default on non-English tenants' {
+            Mock Invoke-UKGHRSDRequest {
+                $script:calls.Add(@{ Query = $Query })
+                @([pscustomobject]@{ id = 'conges'; name = 'ConfÃ©s payÃ©s' })
+            }
+
+            Get-UKGHRSDRequestForm -Name 'ConfÃ©s payÃ©s' -LanguageCode 'fr-fr' | Out-Null
+
+            $script:calls[0].Query.language_code | Should -Be 'fr-fr'
+        }
+
+        It '-Name narrows fuzzy q matches to the exact-name form' {
+            # q is full-text and can return forms whose description or
+            # keywords match. Assert we filter to the exact name.
+            Mock Invoke-UKGHRSDRequest {
+                @(
+                    [pscustomobject]@{ id = 'time-off-accruals'; name = 'Time Off & Accruals' }
+                    [pscustomobject]@{ id = 'time-off-policy';   name = 'Time Off Policy Guide' }
+                )
+            }
+
+            $r = Get-UKGHRSDRequestForm -Name 'Time Off & Accruals'
+
+            $r.id | Should -Be 'time-off-accruals'
+        }
+
+        It '-Name matches case-insensitively' {
+            Mock Invoke-UKGHRSDRequest {
+                @([pscustomobject]@{ id = 'time-off-accruals'; name = 'Time Off & Accruals' })
+            }
+
+            $r = Get-UKGHRSDRequestForm -Name 'time off & accruals'
+
+            $r.id | Should -Be 'time-off-accruals'
+        }
+
+        It '-Name throws when no exact-name match is found and hints at -LanguageCode' {
+            Mock Invoke-UKGHRSDRequest { @() }
+
+            { Get-UKGHRSDRequestForm -Name 'Does Not Exist' } |
+                Should -Throw "*No request form found with name = 'Does Not Exist'*LanguageCode*"
+        }
+
+        It '-Id and -Name are mutually exclusive via parameter sets' {
+            Mock Invoke-UKGHRSDRequest { }
+            { Get-UKGHRSDRequestForm -Id 'x' -Name 'y' } |
+                Should -Throw '*Parameter set cannot be resolved*'
+        }
+    }
+}
+
 Describe 'form_data resolution' {
     InModuleScope UKGHRSD {
         It 'joins field_id answers to their form labels' {
